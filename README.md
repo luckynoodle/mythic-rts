@@ -52,6 +52,23 @@ to position it, then tap it again (or press **Place**) to start construction.
 
 On desktop, the left mouse acts as touch, the wheel zooms and right-click issues commands.
 
+## Play in the browser
+
+**▶ https://luckynoodle.github.io/mythic-rts/**
+
+Every push to `main` builds the game for the web and publishes it there, through
+`.github/workflows/pages.yml`. It works on desktop browsers and in Safari on iPhone and iPad,
+which makes it the quickest way to try touch controls on a real device.
+
+- The web build uses Godot's Compatibility renderer (WebGL 2), so it looks slightly flatter
+  and runs slower than the native iOS app, which uses the Mobile renderer. It's the same project
+  and the same code; only the export target differs.
+- **One-time setup:** in the repo, go to **Settings → Pages → Build and deployment → Source:
+  GitHub Actions**. GitHub Pages needs a public repo on the Free plan, or GitHub Pro for a private one.
+  Then re-run the "Web build (GitHub Pages)" workflow from the Actions tab.
+- To build it locally, export the **Web** preset from Godot (*Project → Export*) and serve the
+  folder with any static web server, e.g. `python3 -m http.server -d build/web`.
+
 ## Getting started
 
 ### Requirements

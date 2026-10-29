@@ -304,6 +304,13 @@ func _environment() -> void:
 	sun.shadow_blur = 1.2
 	sun.directional_shadow_max_distance = 110.0
 	add_child(sun)
+	# The web build uses the Compatibility renderer (WebGL 2), which comes out
+	# brighter than the Mobile renderer used on iOS; even them out.
+	var method := str(ProjectSettings.get_setting_with_override("rendering/renderer/rendering_method"))
+	if OS.has_feature("web") or method == "gl_compatibility":
+		env.ambient_light_energy = 0.2
+		env.tonemap_exposure = 0.82
+		sun.light_energy = 1.1
 
 
 func _terrain() -> void:

@@ -48,7 +48,7 @@ func _ready() -> void:
 	view = WorldView.new()
 	add_child(view)
 	view.camera.zoom = 1.25
-	view.camera.focus = bases[PLAYER_TEAM] + Vector2(160, 40)
+	view.camera.focus = bases[PLAYER_TEAM] + Vector2(110, 80)
 
 	input_ctrl = TouchInput.new()
 	input_ctrl.camera = view.camera
