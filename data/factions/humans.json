@@ -6,6 +6,7 @@
 	"hq": "town_hall",
 	"builder": "peasant",
 	"supply_building": "farm",
+	"placeholder": { "race": "human", "skin": "#ecc098", "bulk": 1.0 },
 	"starting_resources": { "gold": 300, "wood": 200, "stone": 0 },
 	"starting_units": ["peasant", "peasant", "peasant", "peasant", "footman"],
 
@@ -37,7 +38,7 @@
 			"cost": { "gold": 60, "wood": 40 },
 			"train_time": 15,
 			"requires": ["lumber_mill"],
-			"attack": { "damage": 9, "range": 170, "cooldown": 1.5, "projectile": true, "projectile_speed": 520 }
+			"attack": { "damage": 9, "range": 170, "cooldown": 1.5, "projectile": true, "projectile_speed": 520, "projectile_visual": "arrow" }
 		},
 		"knight": {
 			"name": "Knight",
@@ -55,7 +56,7 @@
 			"hp": 160, "armor": 1, "speed": 45, "radius": 16, "sight": 340, "supply": 3,
 			"cost": { "gold": 120, "wood": 150 },
 			"train_time": 28,
-			"attack": { "damage": 45, "range": 280, "cooldown": 4.0, "projectile": true, "projectile_speed": 380, "splash": 40 }
+			"attack": { "damage": 45, "range": 280, "cooldown": 4.0, "projectile": true, "projectile_speed": 380, "splash": 40, "projectile_visual": "bolt" }
 		}
 	},
 

@@ -6,6 +6,7 @@
 	"hq": "great_hall",
 	"builder": "peon",
 	"supply_building": "pig_farm",
+	"placeholder": { "race": "orc", "skin": "#70a848", "bulk": 1.15 },
 	"starting_resources": { "gold": 300, "wood": 200, "stone": 0 },
 	"starting_units": ["peon", "peon", "peon", "peon", "grunt"],
 
@@ -37,7 +38,7 @@
 			"cost": { "gold": 65, "wood": 35 },
 			"train_time": 15,
 			"requires": ["war_mill"],
-			"attack": { "damage": 11, "range": 150, "cooldown": 1.6, "projectile": true, "projectile_speed": 460 }
+			"attack": { "damage": 11, "range": 150, "cooldown": 1.6, "projectile": true, "projectile_speed": 460, "projectile_visual": "axe" }
 		},
 		"ogre": {
 			"name": "Ogre",
@@ -55,7 +56,7 @@
 			"hp": 140, "armor": 1, "speed": 42, "radius": 17, "sight": 340, "supply": 3,
 			"cost": { "gold": 110, "wood": 160 },
 			"train_time": 30,
-			"attack": { "damage": 55, "range": 300, "cooldown": 4.5, "projectile": true, "projectile_speed": 320, "splash": 50 }
+			"attack": { "damage": 55, "range": 300, "cooldown": 4.5, "projectile": true, "projectile_speed": 320, "splash": 50, "projectile_visual": "boulder" }
 		}
 	},
 

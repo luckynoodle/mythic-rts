@@ -10,6 +10,7 @@ var _age := 0.0
 
 func _ready() -> void:
 	z_index = 40
+	add_to_group("markers")
 
 
 func _process(delta: float) -> void:

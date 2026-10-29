@@ -110,8 +110,9 @@ func spawn_resource(resource_type: String, pos: Vector2, amount: int) -> Resourc
 	return n
 
 
-func spawn_projectile(team: int, from: Vector2, target, damage: float, speed: float, splash: float, color: Color) -> void:
+func spawn_projectile(team: int, from: Vector2, target, damage: float, speed: float, splash: float, color: Color, visual := "") -> void:
 	var p := Projectile.new()
+	p.visual = visual
 	p.team = team
 	p.target = target
 	p.target_pos = target.global_position

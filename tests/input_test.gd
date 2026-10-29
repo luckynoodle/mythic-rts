@@ -33,6 +33,7 @@ func _run() -> void:
 	await _test_build_placement()
 	await _test_hud_blocks_world_taps()
 	await _test_box_select()
+	await _test_tap_head_selects()
 	await _test_pan_and_pinch()
 
 	print("INPUT_TESTS %s (%d failure(s))" % ["PASSED" if _failures == 0 else "FAILED", _failures])
@@ -44,7 +45,7 @@ func _run() -> void:
 func _test_tap_select() -> void:
 	var peasant := _own_unit("peasant")
 	await _look_at(peasant.global_position)
-	await _tap(_to_screen(peasant.global_position))
+	await _tap(_to_screen(peasant.global_position, 1.0))
 	_check(input_ctrl.selection == [peasant], "tapping a peasant selects it")
 	_check(peasant.selected, "selected peasant is flagged as selected")
 
@@ -52,20 +53,30 @@ func _test_tap_select() -> void:
 func _test_double_tap() -> void:
 	var peasant := _own_unit("peasant")
 	await _look_at(peasant.global_position)
-	await _tap(_to_screen(peasant.global_position))
-	await _tap(_to_screen(peasant.global_position), true)
+	await _tap(_to_screen(peasant.global_position, 1.0))
+	await _tap(_to_screen(peasant.global_position, 1.0), true)
 	var peasants := input_ctrl.selected_own_units().filter(func(u): return u.def_id == "peasant").size()
 	_check(peasants >= 3, "double-tapping a peasant selects every peasant on screen (got %d)" % peasants)
-	await _tap(_to_screen(peasant.global_position))
+	await _tap(_to_screen(peasant.global_position, 1.0))
 	_check(input_ctrl.selection == [peasant], "a single tap goes back to one unit")
+
+
+func _test_tap_head_selects() -> void:
+	var footman := _own_unit("footman")
+	input_ctrl.set_selection([])
+	await _look_at(footman.global_position)
+	await _tap(_to_screen(footman.global_position, ViewSpace.unit_height(footman.def) * 0.9))
+	_check(input_ctrl.selection == [footman], "tapping a unit's head (not its feet) selects it in 3D")
 
 
 func _test_tap_move() -> void:
 	var peasant: Unit = input_ctrl.selection[0]
-	var dest := _free_spot(peasant.global_position, Vector2(40, 40))
+	var guess := peasant.global_position + Vector2(120, 20)
+	await _look_at(guess)
+	var dest := _free_spot(guess, Vector2(40, 40))
 	await _tap(_to_screen(dest))
 	_check(peasant.state == Unit.State.MOVE, "tapping the ground orders a move")
-	await _frames(90)
+	await _frames(180)
 	_check(peasant.global_position.distance_to(dest) < 30.0, "peasant arrives at the destination")
 
 
@@ -73,7 +84,7 @@ func _test_tap_gather() -> void:
 	var peasant: Unit = input_ctrl.selection[0]
 	var mine := Game.nearest_resource("gold", peasant.global_position)
 	await _look_at(mine.global_position)
-	await _tap(_to_screen(mine.global_position))
+	await _tap(_to_screen(mine.global_position, 1.0))
 	_check(peasant.state == Unit.State.GATHER and peasant.job_type == "gold", "tapping a gold mine starts gathering")
 	var gold_before := Game.get_resource(0, "gold")
 	await _frames(60 * 14)
@@ -84,7 +95,7 @@ func _test_tap_gather() -> void:
 func _test_train_from_building() -> void:
 	var hall := _own_building("town_hall")
 	await _look_at(hall.global_position)
-	await _tap(_to_screen(hall.global_position))
+	await _tap(_to_screen(hall.global_position, 2.0))
 	_check(input_ctrl.selected_own_building() == hall, "tapping the town hall selects it")
 	await _frames(2)
 	var btn := _find_action("Peasant")
@@ -101,7 +112,7 @@ func _test_build_placement() -> void:
 	Game.add_resource(0, "wood", 500)
 	var peasant := _own_unit("peasant")
 	await _look_at(peasant.global_position)
-	await _tap(_to_screen(peasant.global_position))
+	await _tap(_to_screen(peasant.global_position, 1.0))
 	await _frames(2)
 	var btn := _find_action("Farm")
 	_check(btn != null, "builders show a Farm button")
@@ -133,7 +144,7 @@ func _test_build_placement() -> void:
 func _test_hud_blocks_world_taps() -> void:
 	var peasant := _own_unit("peasant")
 	await _look_at(peasant.global_position)
-	await _tap(_to_screen(peasant.global_position))
+	await _tap(_to_screen(peasant.global_position, 1.0))
 	var top_bar_point := Vector2(hud.get_viewport().get_visible_rect().size.x * 0.3, 30)
 	await _tap(top_bar_point)
 	_check(input_ctrl.selection == [peasant], "tapping the HUD does not deselect or command")
@@ -155,19 +166,21 @@ func _test_box_select() -> void:
 func _test_pan_and_pinch() -> void:
 	var cam := input_ctrl.camera
 	await _look_at(Game.MAP_SIZE * 0.5)
-	var start := cam.position
+	var start := cam.focus
 	await _drag(Vector2(640, 360), Vector2(540, 360))
-	_check(cam.position.x > start.x + 50.0, "one-finger drag pans the camera")
-	var zoom_before := cam.zoom.x
+	var expected := 100.0 * cam.world_px_per_screen_px()
+	_check(cam.focus.x > start.x + expected * 0.7,
+			"one-finger drag pans the camera (%.0f world px, expected ~%.0f)" % [cam.focus.x - start.x, expected])
+	var zoom_before := cam.zoom
 	await _pinch(Vector2(640, 360), 80.0, 160.0)
-	_check(cam.zoom.x > zoom_before * 1.5, "pinching out zooms in (%.2f -> %.2f)" % [zoom_before, cam.zoom.x])
+	_check(cam.zoom > zoom_before * 1.5, "pinching out zooms in (%.2f -> %.2f)" % [zoom_before, cam.zoom])
 
 
 # ---------------------------------------------------------------- helpers
 
 ## Centres the camera on a world position so taps there land on the map, not the HUD.
 func _look_at(world_pos: Vector2) -> void:
-	input_ctrl.camera.position = world_pos
+	input_ctrl.focus_on(world_pos)
 	input_ctrl.clamp_camera()
 	await _frames(2)
 
@@ -177,8 +190,10 @@ func _frames(n: int) -> void:
 		await get_tree().physics_frame
 
 
-func _to_screen(world_pos: Vector2) -> Vector2:
-	return main.get_viewport().get_canvas_transform() * world_pos
+## Screen position of a world point, `height` metres above the ground
+## (taps on units aim at their body, like a player would).
+func _to_screen(world_pos: Vector2, height := 0.0) -> Vector2:
+	return input_ctrl.camera.world_to_screen(world_pos, height)
 
 
 ## Converts a viewport position to window coordinates, which is what real touch
@@ -244,16 +259,22 @@ func _pinch(center: Vector2, from_half: float, to_half: float) -> void:
 
 ## Finds open ground near `near` (no units, buildings or resources in a box of `size`).
 func _free_spot(near: Vector2, size: Vector2) -> Vector2:
-	for ring in range(0, 12):
-		for k in 12:
-			var p := near + Vector2.from_angle(TAU * k / 12.0) * 40.0 * ring
+	for ring in range(0, 24):
+		for k in 16:
+			var p := near + Vector2.from_angle(TAU * k / 16.0) * 24.0 * ring
 			p = p.snapped(Vector2(16, 16))
 			var r := Rect2(p - size * 0.5, size)
 			if not Game.is_area_free(r):
 				continue
 			if Game.units.any(func(u): return r.grow(u.radius).has_point(u.global_position)):
 				continue
+			# It must also be clear on screen: visible, not under the HUD,
+			# and not covered by a tall unit or building in front of it.
+			var sp := _to_screen(p)
+			if not input_ctrl.camera.is_on_screen(p) or hud.blocks(sp) or input_ctrl.pick_at(sp) != null:
+				continue
 			return p
+	push_error("input_test: no free spot near %s" % near)
 	return near
 
 

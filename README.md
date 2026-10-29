@@ -1,11 +1,15 @@
 # Mythic RTS
 
-A touch-first 2D real-time strategy game for **iPhone and iPad**, built with **Godot 4**.
+A touch-first **3D** real-time strategy game for **iPhone and iPad**, built with **Godot 4**,
+in a stylised / heroic, Warcraft-like look.
 Mythical factions — humans, orcs, and soon elves, vampires, fairies and more — gather
 resources, raise bases and fight for control of the land.
 
-> **Status: playable prototype (v0.1).** Humans vs. Orcs skirmish against an AI opponent,
-> with placeholder shapes instead of art.
+![Battle](docs/screenshots/battle.png)
+
+> **Status: playable prototype (v0.2).** Humans vs. Orcs skirmish against an AI opponent,
+> rendered in 3D with code-built placeholder models. They are swapped for real models simply by
+> dropping `.glb` files into `art/`; see [docs/ART_GUIDE.md](docs/ART_GUIDE.md).
 
 ## What's in the game so far
 
@@ -18,6 +22,15 @@ resources, raise bases and fight for control of the land.
 - **Combat.** Melee and ranged units, splash-damage siege engines, auto-targeting and attack-move.
 - **AI opponent.** It manages its economy, follows a build order from the faction file, trains an army and attacks in growing waves after a peaceful opening.
 - **Touch controls and HUD**, built for phones and tablets and safe-area aware.
+- **3D view**:
+  - a fixed-angle RTS camera with real-time sun and shadows
+  - units that turn and animate as they walk, fight, mine and build
+  - buildings that rise out of the ground as they're built and smoke when damaged
+  - a border forest around the map
+- **Art pipeline**:
+  - every model can be replaced by a file, which is auto-detected
+  - team colours are applied to any material named "team"
+  - imported animations play automatically
 
 ## Controls
 
@@ -33,7 +46,8 @@ resources, raise bases and fight for control of the land.
 | **Army** / **Idle Worker** buttons | Quick-select your army / cycle idle workers |
 | **Attack-move**, then tap the ground | Advance and fight anything on the way |
 
-When building, tap a building button and a ghost footprint appears. Tap or drag the ghost
+Taps hit what you see on screen. Tapping a soldier's head or a tower's roof selects it.
+When building, tap a building button and a see-through ghost of the building appears. Tap or drag the ghost
 to position it, then tap it again (or press **Place**) to start construction.
 
 On desktop, the left mouse acts as touch, the wheel zooms and right-click issues commands.
@@ -69,7 +83,9 @@ data/factions/        Faction definitions (units, buildings, costs, AI build ord
 scenes/main.tscn      The skirmish scene (everything else is built in code)
 scripts/autoload/     GameData (loads JSON) and Game (match state, spawning, queries)
 scripts/entities/     Entity base class, Unit, Building, ResourceNode, Projectile
+scripts/view3d/       3D view: WorldView, RTSCamera, model library, placeholders, visuals
 scripts/input/        TouchInput (gestures → commands), placement ghost, markers
+art/                  Drop-in 3D models (see docs/ART_GUIDE.md)
 scripts/ui/           HUD (resource bar, selection panel, action buttons)
 scripts/ai/           SimpleAI opponent
 tests/                Automated touch-input tests
@@ -87,6 +103,10 @@ docs/                 Roadmap and how to add a faction
 - **`Unit`.** A small state machine with the states `IDLE`, `MOVE`, `ATTACK`, `GATHER`, `RETURN` and `BUILD`.
   The player's `TouchInput` and the `SimpleAI` both drive units through the same `command_*` methods.
 - **`Building`.** Handles construction progress, training queues, rally points, drop-off and supply.
+- **The simulation is 2D; the view is 3D.** The game logic runs on a flat plane in pixels,
+  in a hidden `World` node. `WorldView` mirrors it every frame in 3D at 16 px = 1 m, and
+  `RTSCamera` converts between screen and world. Art can therefore change freely without
+  touching gameplay, and the simulation stays deterministic for future multiplayer.
 
 ## Testing
 
@@ -94,6 +114,8 @@ docs/                 Roadmap and how to add a faction
 python3 tools/validate_data.py                               # check faction JSON
 GODOT=/path/to/godot tools/run_tests.sh                      # everything below
 godot --headless -- --run-input-tests                        # simulated touch tests
+godot --headless -- --run-model-tests                        # 3D model pipeline + placeholders
+godot -- --ai-vs-ai --screenshots=/tmp/shots                 # review screenshots (needs a GPU)
 godot --headless --fixed-fps 30 -- --ai-vs-ai --quit-after-seconds=600   # AI vs AI match
 ```
 
@@ -104,6 +126,6 @@ GitHub Actions runs `tools/run_tests.sh` on every push and pull request.
 See [docs/ROADMAP.md](docs/ROADMAP.md). The next big items are:
 - real pathfinding
 - fog of war and a minimap
-- art and sound
+- real models and animations, replacing the placeholders, plus sound
 - more factions (elves, vampires, fairies)
 - a main menu with faction select

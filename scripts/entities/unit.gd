@@ -224,7 +224,7 @@ func _perform_attack() -> void:
 	if attack.get("projectile", false):
 		Game.spawn_projectile(team, global_position, target, dmg,
 				float(attack.get("projectile_speed", 450)), float(attack.get("splash", 0)),
-				team_color.lightened(0.45))
+				team_color.lightened(0.45), str(attack.get("projectile_visual", "")))
 	else:
 		target.take_damage(dmg, self)
 	_flash = 0.12

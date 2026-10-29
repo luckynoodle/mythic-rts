@@ -1,10 +1,14 @@
 extends Node2D
-## Builds a skirmish match: the map, both bases, the camera, the HUD, input and the AI.
+## Builds a skirmish match: the map, both bases, the 3D view, the HUD, input and the AI.
+##
+## The simulation lives in a hidden 2D "World" node; WorldView renders it in 3D.
 ##
 ## Command-line options (after `--`), used for automated testing:
 ##   --ai-vs-ai               the AI plays both sides
 ##   --quit-after-seconds=N   quit after N seconds of game time and print a summary
 ##   --run-input-tests        run tests/input_test.gd (simulated touch input) and quit
+##   --run-model-tests        run tests/model_test.gd (3D model pipeline) and quit
+##   --screenshots=DIR        save review screenshots to DIR (tests/screenshots.gd), then quit
 
 const PLAYER_TEAM := 0
 const AI_TEAM := 1
@@ -13,12 +17,14 @@ const AI_TEAM := 1
 @export var ai_faction := "orcs"
 @export var map_seed := 1337
 
-var camera: Camera2D
+var view: WorldView
 var hud: HUD
 var input_ctrl: TouchInput
 
 var _ai_vs_ai := false
 var _run_input_tests := false
+var _screenshot_dir := ""
+var _run_model_tests := false
 var _quit_after := -1.0
 var _report_timer := 0.0
 
@@ -30,7 +36,7 @@ func _ready() -> void:
 
 	var world := Node2D.new()
 	world.name = "World"
-	world.y_sort_enabled = true
+	world.visible = false  # simulation only; WorldView draws everything in 3D
 	add_child(world)
 	Game.world = world
 
@@ -38,13 +44,15 @@ func _ready() -> void:
 	Game.add_player(AI_TEAM, ai_faction, true)
 	var bases := _build_map()
 
-	camera = Camera2D.new()
-	camera.position = bases[PLAYER_TEAM]
-	add_child(camera)
-	camera.make_current()
+	Game.refresh_snapshots()
+	view = WorldView.new()
+	add_child(view)
+	view.camera.zoom = 1.25
+	view.camera.focus = bases[PLAYER_TEAM] + Vector2(160, 40)
 
 	input_ctrl = TouchInput.new()
-	input_ctrl.camera = camera
+	input_ctrl.camera = view.camera
+	view.input_ctrl = input_ctrl
 	input_ctrl.team = PLAYER_TEAM
 	hud = HUD.new()
 	hud.team = PLAYER_TEAM
@@ -65,6 +73,14 @@ func _ready() -> void:
 		var tests: Node = load("res://tests/input_test.gd").new()
 		tests.name = "InputTests"
 		add_child(tests)
+	if _run_model_tests:
+		var mt: Node = load("res://tests/model_test.gd").new()
+		mt.name = "ModelTests"
+		add_child(mt)
+	if _screenshot_dir != "":
+		var shots: Node = load("res://tests/screenshots.gd").new()
+		shots.out_dir = _screenshot_dir
+		add_child(shots)
 
 
 func _parse_args() -> void:
@@ -73,6 +89,10 @@ func _parse_args() -> void:
 			_ai_vs_ai = true
 		elif arg == "--run-input-tests":
 			_run_input_tests = true
+		elif arg == "--run-model-tests":
+			_run_model_tests = true
+		elif arg.begins_with("--screenshots="):
+			_screenshot_dir = arg.get_slice("=", 1)
 		elif arg.begins_with("--quit-after-seconds="):
 			_quit_after = float(arg.get_slice("=", 1))
 
@@ -149,7 +169,6 @@ func _build_map() -> Dictionary:
 	for x in [size.x * 0.3, size.x * 0.7]:
 		_tree_cluster(Vector2(x, 260), 12, 220.0, rng)
 		_tree_cluster(Vector2(x, size.y - 260), 12, 220.0, rng)
-	queue_redraw()
 	return bases
 
 
@@ -185,18 +204,3 @@ func _tree_cluster(center: Vector2, count: int, spread: float, rng: RandomNumber
 			placed.append(p)
 			Game.spawn_resource("wood", p, 300)
 
-
-func _draw() -> void:
-	var size := Game.MAP_SIZE
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.23, 0.33, 0.19))
-	var rng := RandomNumberGenerator.new()
-	rng.seed = map_seed + 1
-	for i in 120:
-		var p := Vector2(rng.randf() * size.x, rng.randf() * size.y)
-		draw_circle(p, rng.randf_range(30, 90), Color(0.2, 0.3, 0.17, 0.6))
-	var grid := Color(1, 1, 1, 0.04)
-	for x in range(0, int(size.x) + 1, 160):
-		draw_line(Vector2(x, 0), Vector2(x, size.y), grid, 1.0)
-	for y in range(0, int(size.y) + 1, 160):
-		draw_line(Vector2(0, y), Vector2(size.x, y), grid, 1.0)
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.6), false, 6.0)

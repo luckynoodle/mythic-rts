@@ -31,6 +31,15 @@ check_log "$LOG_DIR/input.log"
 grep -q "INPUT_TESTS PASSED" "$LOG_DIR/input.log" || { echo "Input tests failed"; exit 1; }
 [ "$status" -eq 0 ] || exit "$status"
 
+echo "== 3D model pipeline tests"
+set +e
+"$GODOT" --headless --fixed-fps 60 -- --run-model-tests 2>&1 | tee "$LOG_DIR/model.log"
+status=${PIPESTATUS[0]}
+set -e
+check_log "$LOG_DIR/model.log"
+grep -q "MODEL_TESTS PASSED" "$LOG_DIR/model.log" || { echo "Model tests failed"; exit 1; }
+[ "$status" -eq 0 ] || exit "$status"
+
 echo "== AI vs AI smoke match"
 "$GODOT" --headless --fixed-fps 30 -- --ai-vs-ai --quit-after-seconds=600 2>&1 | tee "$LOG_DIR/smoke.log"
 check_log "$LOG_DIR/smoke.log"

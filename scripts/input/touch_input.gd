@@ -9,6 +9,10 @@ extends Node
 ##   Two-finger pinch / drag ...... zoom / pan
 ##
 ## On desktop, the left mouse emulates touch, the wheel zooms and right-click commands.
+##
+## The camera is a 3D RTSCamera, but it works in game-world pixels, so all game
+## logic here stays 2D. Taps are matched against what is drawn on screen
+## (a unit's whole body, a building's whole volume), not just its footprint.
 
 signal selection_changed
 
@@ -16,12 +20,10 @@ const TAP_MAX_MOVE := 16.0     # screen pixels
 const TAP_MAX_TIME := 0.4      # seconds
 const DOUBLE_TAP_TIME := 0.35
 const TAP_SLOP := 18.0         # extra screen-pixel radius that makes small units easy to hit
-const MIN_ZOOM := 0.5
-const MAX_ZOOM := 2.0
 const SNAP := 16.0
 const FORMATION_SPACING := 30.0
 
-var camera: Camera2D
+var camera: RTSCamera
 var hud = null
 var team := 0
 
@@ -45,7 +47,7 @@ func _now() -> float:
 
 
 func screen_to_world(p: Vector2) -> Vector2:
-	return get_viewport().get_canvas_transform().affine_inverse() * p
+	return camera.screen_to_world(p)
 
 
 func _process(_delta: float) -> void:
@@ -65,12 +67,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_WHEEL_UP:
-				_set_zoom(camera.zoom.x * 1.1)
+				_set_zoom(camera.zoom * 1.1)
 			MOUSE_BUTTON_WHEEL_DOWN:
-				_set_zoom(camera.zoom.x / 1.1)
+				_set_zoom(camera.zoom / 1.1)
 			MOUSE_BUTTON_RIGHT:
 				if placing == "":
-					command_at(screen_to_world(event.position))
+					command_at(screen_to_world(event.position), pick_at(event.position))
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		cancel_placement()
 		set_selection([])
@@ -141,7 +143,7 @@ func _on_drag(e: InputEventScreenDrag) -> void:
 		_gesture = "box" if select_mode else "pan"
 	match _gesture:
 		"pan":
-			_pan(e.relative)
+			camera.pan_screen(e.position - e.relative, e.position)
 		"box":
 			if hud:
 				hud.show_box(Rect2(t["start"], e.position - t["start"]).abs())
@@ -151,29 +153,18 @@ func _on_drag(e: InputEventScreenDrag) -> void:
 
 # ---------------------------------------------------------------- camera
 
-func _ready() -> void:
-	clamp_camera.call_deferred()
-
-
-func _pan(screen_delta: Vector2) -> void:
-	camera.position -= screen_delta / camera.zoom.x
-	clamp_camera()
-
-
 func _set_zoom(z: float) -> void:
-	z = clampf(z, MIN_ZOOM, MAX_ZOOM)
-	camera.zoom = Vector2(z, z)
-	clamp_camera()
+	camera.zoom = z
 
 
-## Keeps the view inside the map so the player never looks at empty space.
+## Keeps the camera over the map.
 func clamp_camera() -> void:
-	var half := get_viewport().get_visible_rect().size * 0.5 / camera.zoom.x
-	var map := Game.MAP_SIZE
-	var p := camera.position
-	p.x = clampf(p.x, half.x, map.x - half.x) if half.x * 2.0 < map.x else map.x * 0.5
-	p.y = clampf(p.y, half.y, map.y - half.y) if half.y * 2.0 < map.y else map.y * 0.5
-	camera.position = p
+	camera.clamp_focus()
+
+
+func focus_on(world_pos: Vector2) -> void:
+	camera.focus = world_pos
+	clamp_camera()
 
 
 func _begin_pinch(active: Array) -> void:
@@ -183,7 +174,7 @@ func _begin_pinch(active: Array) -> void:
 	var a: Vector2 = _touches[active[0]]["pos"]
 	var b: Vector2 = _touches[active[1]]["pos"]
 	_pinch_dist = maxf(1.0, a.distance_to(b))
-	_pinch_zoom = camera.zoom.x
+	_pinch_zoom = camera.zoom
 	_pinch_mid = (a + b) * 0.5
 
 
@@ -192,7 +183,7 @@ func _update_pinch(active: Array) -> void:
 	var b: Vector2 = _touches[active[1]]["pos"]
 	var mid := (a + b) * 0.5
 	_set_zoom(_pinch_zoom * a.distance_to(b) / _pinch_dist)
-	_pan(mid - _pinch_mid)
+	camera.pan_screen(_pinch_mid, mid)
 	_pinch_mid = mid
 
 
@@ -203,7 +194,7 @@ func _handle_tap(screen_pos: Vector2) -> void:
 	if placing != "":
 		_move_ghost(wp)
 		return
-	var hit = Game.entity_at(wp, TAP_SLOP / camera.zoom.x)
+	var hit = pick_at(screen_pos)
 	var now := _now()
 	var is_double: bool = hit != null and hit == _last_tap_hit and now - _last_tap_time <= DOUBLE_TAP_TIME
 	_last_tap_time = now
@@ -227,8 +218,6 @@ func _handle_tap(screen_pos: Vector2) -> void:
 
 ## Issues the "smart" command for the current selection at a world position.
 func command_at(wp: Vector2, hit = null) -> void:
-	if hit == null:
-		hit = Game.entity_at(wp, TAP_SLOP / camera.zoom.x)
 	var units := selected_own_units()
 	var building := selected_own_building()
 
@@ -306,6 +295,73 @@ func _marker(pos: Vector2, color: Color) -> void:
 	Game.world.add_child(m)
 
 
+# ---------------------------------------------------------------- picking
+
+## What the player tapped: the unit, building or resource drawn under `screen_pos`.
+## Units win over buildings, which win over resources; the closest on screen wins.
+func pick_at(screen_pos: Vector2):
+	var best = null
+	var best_d := INF
+	for u in Game.units:
+		if not Entity.alive(u):
+			continue
+		var d := _distance_to_upright(screen_pos, u.global_position, u.radius, ViewSpace.unit_height(u.def))
+		if d < best_d:
+			best_d = d
+			best = u
+	if best != null:
+		return best
+	for b in Game.buildings:
+		if not Entity.alive(b):
+			continue
+		var rect := _building_screen_rect(b)
+		if rect.has_area() and rect.grow(TAP_SLOP * 0.5).has_point(screen_pos):
+			return b
+	for n in Game.resource_nodes:
+		if not ResourceNode.alive(n):
+			continue
+		var d := _distance_to_upright(screen_pos, n.global_position, n.radius, ViewSpace.resource_height(n.resource_type))
+		if d < best_d:
+			best_d = d
+			best = n
+	return best
+
+
+## Returns a "hit score" (lower is better) if screen_pos lies on an upright thing
+## standing at `world_pos`, or INF if it misses.
+func _distance_to_upright(screen_pos: Vector2, world_pos: Vector2, radius_px: float, height_m: float) -> float:
+	if not _projects_sanely(world_pos, height_m):
+		return INF
+	var feet := camera.world_to_screen(world_pos)
+	var top := camera.world_to_screen(world_pos, height_m)
+	var side := camera.world_to_screen(world_pos + Vector2(radius_px, 0))
+	var r := feet.distance_to(side) + TAP_SLOP
+	var d := Geometry2D.get_closest_point_to_segment(screen_pos, feet, top).distance_to(screen_pos)
+	return d if d <= r else INF
+
+
+## False for things behind (or nearly behind) the camera, whose projected
+## screen positions are meaningless and would otherwise steal taps.
+func _projects_sanely(world_pos: Vector2, height_m: float) -> bool:
+	for h in [0.0, height_m]:
+		if camera.is_position_behind(ViewSpace.to_3d(world_pos, h)):
+			return false
+	var vis := get_viewport().get_visible_rect().grow(400.0)
+	return vis.has_point(camera.world_to_screen(world_pos)) or vis.has_point(camera.world_to_screen(world_pos, height_m))
+
+
+func _building_screen_rect(b: Building) -> Rect2:
+	var r := b.get_rect()
+	var h := ViewSpace.building_height(b.def)
+	if not _projects_sanely(b.global_position, h):
+		return Rect2()
+	var rect := Rect2(camera.world_to_screen(r.position), Vector2.ZERO)
+	for corner in [r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]:
+		for height in [0.0, h]:
+			rect = rect.expand(camera.world_to_screen(corner, height))
+	return rect
+
+
 # ---------------------------------------------------------------- selection
 
 func set_selection(list: Array) -> void:
@@ -348,21 +404,12 @@ func select_idle_builder() -> void:
 	if selection.size() == 1 and idle.has(selection[0]):
 		pick = idle[(idle.find(selection[0]) + 1) % idle.size()]
 	set_selection([pick])
-	camera.position = pick.global_position
-	clamp_camera()
-
-
-func _visible_world_rect() -> Rect2:
-	var vis := get_viewport().get_visible_rect()
-	var a := screen_to_world(vis.position)
-	var b := screen_to_world(vis.end)
-	return Rect2(a, b - a).abs()
+	focus_on(pick.global_position)
 
 
 func _select_same_type_on_screen(u: Unit) -> void:
-	var r := _visible_world_rect()
 	set_selection(Game.units_of(team).filter(
-			func(o): return o.def_id == u.def_id and r.has_point(o.global_position)))
+			func(o): return o.def_id == u.def_id and camera.is_on_screen(o.global_position)))
 
 
 func toggle_select_mode(on: bool) -> void:
@@ -373,10 +420,11 @@ func toggle_select_mode(on: bool) -> void:
 func _finish_box(start_screen: Vector2, end_screen: Vector2) -> void:
 	if hud:
 		hud.hide_box()
-	var a := screen_to_world(start_screen)
-	var b := screen_to_world(end_screen)
-	var r := Rect2(a, b - a).abs()
-	var picked := Game.units_of(team).filter(func(u): return r.grow(u.radius).has_point(u.global_position))
+	# Box select happens in screen space, which is what the player sees.
+	var r := Rect2(start_screen, end_screen - start_screen).abs().grow(6.0)
+	var picked := Game.units_of(team).filter(func(u):
+		var h := ViewSpace.unit_height(u.def) * 0.5
+		return r.has_point(camera.world_to_screen(u.global_position, h)))
 	select_mode = false
 	if not picked.is_empty():
 		set_selection(picked)
@@ -416,7 +464,7 @@ func _ghost_rect() -> Rect2:
 func _ghost_hit(screen_pos: Vector2) -> bool:
 	if ghost == null:
 		return false
-	return _ghost_rect().grow(TAP_SLOP / camera.zoom.x).has_point(screen_to_world(screen_pos))
+	return _ghost_rect().grow(TAP_SLOP * camera.world_px_per_screen_px()).has_point(screen_to_world(screen_pos))
 
 
 func _move_ghost(wp: Vector2) -> void:

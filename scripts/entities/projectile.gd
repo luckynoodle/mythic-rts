@@ -9,10 +9,13 @@ var damage := 10.0
 var speed := 450.0
 var splash := 0.0
 var color := Color.WHITE
+## Which model the 3D view should use ("arrow", "axe", "bolt", "boulder"...).
+var visual := ""
 
 
 func _ready() -> void:
 	z_index = 5
+	add_to_group("projectiles")
 
 
 func _physics_process(delta: float) -> void:
