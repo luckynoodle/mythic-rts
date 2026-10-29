@@ -1,0 +1,124 @@
+{
+	"id": "orcs",
+	"name": "Orcs",
+	"description": "Brutal and relentless. Tough warriors, cheap structures and crushing siege weapons.",
+	"color": "#c0392b",
+	"hq": "great_hall",
+	"builder": "peon",
+	"supply_building": "pig_farm",
+	"starting_resources": { "gold": 300, "wood": 200, "stone": 0 },
+	"starting_units": ["peon", "peon", "peon", "peon", "grunt"],
+
+	"units": {
+		"peon": {
+			"name": "Peon",
+			"role": "builder",
+			"description": "Gathers resources and constructs buildings.",
+			"hp": 45, "armor": 0, "speed": 90, "radius": 9, "sight": 200, "supply": 1,
+			"cost": { "gold": 50 },
+			"train_time": 10,
+			"carry_capacity": 10, "gather_time": 2.0, "build_rate": 1.0,
+			"attack": { "damage": 4, "range": 4, "cooldown": 1.5 }
+		},
+		"grunt": {
+			"name": "Grunt",
+			"role": "melee",
+			"description": "Hard-hitting orc warrior.",
+			"hp": 150, "armor": 1, "speed": 78, "radius": 12, "sight": 260, "supply": 1,
+			"cost": { "gold": 85, "wood": 5 },
+			"train_time": 14,
+			"attack": { "damage": 12, "range": 6, "cooldown": 1.05 }
+		},
+		"axe_thrower": {
+			"name": "Axe Thrower",
+			"role": "ranged",
+			"description": "Hurls axes at medium range.",
+			"hp": 75, "armor": 0, "speed": 82, "radius": 10, "sight": 300, "supply": 1,
+			"cost": { "gold": 65, "wood": 35 },
+			"train_time": 15,
+			"requires": ["war_mill"],
+			"attack": { "damage": 11, "range": 150, "cooldown": 1.6, "projectile": true, "projectile_speed": 460 }
+		},
+		"ogre": {
+			"name": "Ogre",
+			"role": "heavy",
+			"description": "A slow, enormous brute that shrugs off blows.",
+			"hp": 320, "armor": 3, "speed": 72, "radius": 16, "sight": 260, "supply": 2,
+			"cost": { "gold": 150, "wood": 20, "stone": 30 },
+			"train_time": 24,
+			"attack": { "damage": 22, "range": 8, "cooldown": 1.5 }
+		},
+		"catapult": {
+			"name": "Catapult",
+			"role": "vehicle",
+			"description": "Lobs boulders that crush groups and buildings.",
+			"hp": 140, "armor": 1, "speed": 42, "radius": 17, "sight": 340, "supply": 3,
+			"cost": { "gold": 110, "wood": 160 },
+			"train_time": 30,
+			"attack": { "damage": 55, "range": 300, "cooldown": 4.5, "projectile": true, "projectile_speed": 320, "splash": 50 }
+		}
+	},
+
+	"buildings": {
+		"great_hall": {
+			"name": "Great Hall",
+			"description": "Headquarters. Trains peons and accepts all resources.",
+			"hp": 1700, "armor": 3, "size": [128, 96],
+			"cost": { "gold": 380, "wood": 230 },
+			"build_time": 85,
+			"trains": ["peon"],
+			"drop_off": ["gold", "wood", "stone"],
+			"supply": 8
+		},
+		"pig_farm": {
+			"name": "Pig Farm",
+			"description": "Feeds the horde. Each farm raises the supply cap.",
+			"hp": 420, "armor": 1, "size": [64, 64],
+			"cost": { "wood": 75 },
+			"build_time": 20,
+			"supply": 6
+		},
+		"war_camp": {
+			"name": "War Camp",
+			"description": "Trains grunts and axe throwers.",
+			"hp": 950, "armor": 2, "size": [112, 80],
+			"cost": { "gold": 150, "wood": 90 },
+			"build_time": 40,
+			"trains": ["grunt", "axe_thrower"]
+		},
+		"war_mill": {
+			"name": "War Mill",
+			"description": "Accepts wood and stone. Unlocks axe throwers.",
+			"hp": 720, "armor": 1, "size": [96, 72],
+			"cost": { "gold": 100, "wood": 70 },
+			"build_time": 35,
+			"drop_off": ["wood", "stone"]
+		},
+		"beastiary": {
+			"name": "Beastiary",
+			"description": "Trains ogres.",
+			"hp": 1050, "armor": 2, "size": [112, 88],
+			"cost": { "gold": 190, "wood": 110, "stone": 60 },
+			"build_time": 50,
+			"requires": ["war_camp"],
+			"trains": ["ogre"]
+		},
+		"siege_works": {
+			"name": "Siege Works",
+			"description": "Builds catapults.",
+			"hp": 900, "armor": 2, "size": [112, 96],
+			"cost": { "gold": 150, "wood": 190, "stone": 80 },
+			"build_time": 55,
+			"requires": ["war_mill"],
+			"trains": ["catapult"]
+		}
+	},
+
+	"ai": {
+		"target_workers": 12,
+		"gather_ratio": { "gold": 0.5, "wood": 0.35, "stone": 0.15 },
+		"stockpile_cap": 400,
+		"build_order": ["pig_farm", "war_camp", "war_mill", "pig_farm", "beastiary", "pig_farm", "siege_works", "war_camp", "pig_farm"],
+		"army": ["grunt", "grunt", "axe_thrower", "ogre", "axe_thrower", "catapult"]
+	}
+}
